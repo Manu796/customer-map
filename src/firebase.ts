@@ -3,6 +3,7 @@ import { initializeApp } from "firebase/app";
 import { getAnalytics } from "firebase/analytics";
 // Importo Firestore (nuestra base de datos NoSQL)
 import { getFirestore } from "firebase/firestore";
+import { getAuth } from "firebase/auth";
 
 // Esta es la configuración que te da Firebase al registrar la app.
 // Contiene las "credenciales" para conectar tu frontend al proyecto.
@@ -23,3 +24,5 @@ const analytics = getAnalytics(app);
 // "db" es la instancia de Firestore.
 // Es la base de datos que vamos a usar en todo el proyecto.
 export const db = getFirestore(app);
+// Auth
+export const auth = getAuth(app);
