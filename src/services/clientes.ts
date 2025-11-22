@@ -14,10 +14,10 @@ import { db } from "../firebase";
 
 // Caracteristicas base de un cliente
 export interface Cliente {
-  fistName: string;
+  firstName: string;
   lastName: string;
   phone: string;
-  adress: string;
+  address: string;
   status: string;
   userId: string;
   lat?: number;

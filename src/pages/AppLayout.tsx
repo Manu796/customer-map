@@ -3,6 +3,9 @@ import { signOut } from "firebase/auth";
 import { useNavigate } from "react-router-dom";
 import { auth } from "../firebase";
 import { useAuth } from "../context/AuthContext";
+import { ClientMap } from "../components/ClientMap";
+import { ClientForm } from "../components/ClientForm";
+import { ClientList } from "../components/ClientList";
 import {
   crearCliente,
   obtenerClientes,
@@ -11,8 +14,14 @@ import {
   type ClienteConId,
 } from "../services/clientes";
 
+function parseCoord(value: string): number | undefined {
+  if (!value) return undefined;
+  const normalized = value.replace(",", ".");
+  const num = Number(normalized);
+  return Number.isNaN(num) ? undefined : num;
+}
+
 function AppLayout() {
-  //Estados dentro del componente
   const navigate = useNavigate();
   const { user } = useAuth();
   const [clientes, setClientes] = useState<ClienteConId[]>([]);
@@ -21,11 +30,11 @@ function AppLayout() {
   const [lastName, setLastName] = useState("");
   const [phone, setPhone] = useState("");
   const [address, setAddress] = useState("");
-  const [status, setStatus] = useState("activo");
-
+  const [status, setStatus] = useState<string>("activo");
   const [editingId, setEditingId] = useState<string | null>(null);
+  const [lat, setLat] = useState<string>("");
+  const [lng, setLng] = useState<string>("");
 
-  //Cargar clientes cuando haya usuario
   useEffect(() => {
     if (!user) return;
     cargarClientes();
@@ -37,156 +46,166 @@ function AppLayout() {
     setClientes(lista);
   };
 
-  //Submit del form
   const handleSubmit = async (e: FormEvent) => {
     e.preventDefault();
     if (!user) return;
 
+    const latNum = parseCoord(lat);
+    const lngNum = parseCoord(lng);
+
+    const baseData: any = {
+      firstName,
+      lastName,
+      phone,
+      address,
+      status,
+      userId: user.uid,
+    };
+
+    if (latNum !== undefined) baseData.lat = latNum;
+    if (lngNum !== undefined) baseData.lng = lngNum;
+
     if (editingId) {
-      await actualizarCliente(editingId, {
-        firstName,
-        lastName,
-        phone,
-        address,
-        status,
-      });
+      await actualizarCliente(editingId, baseData);
     } else {
-      await crearCliente({
-        firstName,
-        lastName,
-        phone,
-        address,
-        status,
-        userId: user.uid,
-      });
+      await crearCliente(baseData);
     }
-    //Limpiar form
+
+    // limpiar inputs
     setFirstName("");
     setLastName("");
     setPhone("");
     setAddress("");
     setStatus("activo");
+    setLat("");
+    setLng("");
     setEditingId(null);
 
     await cargarClientes();
   };
 
-  //Editar / borrar
-  const startEditing = (c: ClienteConId) => {
+  const startEditing = (id: string) => {
+    const c = clientes.find((cl) => cl.id === id);
+    if (!c) return;
     setEditingId(c.id);
     setFirstName(c.firstName);
     setLastName(c.lastName);
     setPhone(c.phone);
     setAddress(c.address);
-    setStatus(c.status);
+    setStatus(c.status ?? "activo");
+    setLat(c.lat?.toString() ?? "");
+    setLng(c.lng?.toString() ?? "");
   };
 
   const handleDelete = async (id: string) => {
     if (!confirm("¿Seguro que querés borrar este cliente?")) return;
-
     await borrarCliente(id);
-    await cargarClientes(); // refresca la lista
+    await cargarClientes();
   };
 
-  //Render simple
-  return (
-    <div style={{ padding: "1rem" }}>
-      <header
+  // 👉 posición editable para el marcador del mapa
+  const latNum = parseCoord(lat);
+  const lngNum = parseCoord(lng);
+  const editablePosition =
+    latNum !== undefined && lngNum !== undefined
+      ? { lat: latNum, lng: lngNum }
+      : null;
+
+  
+    return (
+  <div style={{ height: "100vh", display: "flex", flexDirection: "column" }}>
+    {/* HEADER */}
+    <header
+      style={{
+        display: "flex",
+        justifyContent: "space-between",
+        alignItems: "center",
+        padding: "1rem",
+        height: "70px", // altura fija del header
+        flexShrink: 0,
+      }}
+    >
+      <h2>Clientes</h2>
+      <div>
+        {user?.email}
+        <button
+          onClick={async () => await signOut(auth)}
+          style={{ marginLeft: "1rem" }}
+        >
+          Cerrar sesión
+        </button>
+      </div>
+    </header>
+
+    {/* CONTENEDOR PRINCIPAL SIN SCROLL GENERAL */}
+    <main
+      style={{
+        flex: 1,                       // ← ocupa todo lo que queda de la pantalla
+        display: "grid",
+        gridTemplateColumns: "1.4fr 1fr",
+        gap: "1rem",
+        padding: "1rem",
+        overflow: "hidden",            // ← evita scroll en la página completa
+      }}
+    >
+      {/* MAPA - ocupa todo el alto disponible */}
+      <section
         style={{
-          display: "flex",
-          justifyContent: "space-between",
-          marginBottom: "1rem",
+          height: "100%",
+          overflow: "hidden",
+          borderRadius: "0.7rem",
         }}
       >
-        <h2>Clientes</h2>
-        <div>
-          {user?.email}
-          <button
-            onClick={async () => {
-              await signOut(auth);
-            }}
-            style={{ marginLeft: "1rem" }}
-          >
-            Cerrar sesión
-          </button>
-        </div>
-      </header>
+        <ClientMap
+          clientes={clientes}
+          editablePosition={editablePosition}
+          onEditableMove={(newLat, newLng) => {
+            setLat(String(newLat));
+            setLng(String(newLng));
+          }}
+        />
+      </section>
 
-      {/* FORM */}
-      <form onSubmit={handleSubmit} style={{ marginBottom: "1rem" }}>
-        <input
-          placeholder="Nombre"
-          value={firstName}
-          onChange={(e) => setFirstName(e.target.value)}
+      {/* COLUMNA DERECHA: SCROLL INTERNO */}
+      <section
+        style={{
+          display: "flex",
+          flexDirection: "column",
+          gap: "1rem",
+          height: "100%",
+          overflowY: "auto",          // ← SOLO el panel derecho scrollea
+          paddingRight: "0.5rem",
+        }}
+      >
+        <ClientForm
+          firstName={firstName}
+          lastName={lastName}
+          phone={phone}
+          address={address}
+          lat={lat}
+          lng={lng}
+          status={status}
+          editingId={editingId}
+          onSubmit={handleSubmit}
+          setFirstName={setFirstName}
+          setLastName={setLastName}
+          setPhone={setPhone}
+          setAddress={setAddress}
+          setLat={setLat}
+          setLng={setLng}
+          setStatus={setStatus}
         />
-        <input
-          placeholder="Apellido"
-          value={lastName}
-          onChange={(e) => setLastName(e.target.value)}
-          style={{ marginLeft: "0.5rem" }}
-        />
-        <input
-          placeholder="Teléfono"
-          value={phone}
-          onChange={(e) => setPhone(e.target.value)}
-          style={{ marginLeft: "0.5rem" }}
-        />
-        <input
-          placeholder="Dirección"
-          value={address}
-          onChange={(e) => setAddress(e.target.value)}
-          style={{ marginLeft: "0.5rem" }}
-        />
-        <select
-          value={status}
-          onChange={(e) => setStatus(e.target.value)}
-          style={{ marginLeft: "0.5rem" }}
-        >
-          <option value="activo">Activo</option>
-          <option value="pendiente">Pendiente</option>
-        </select>
 
-        <button type="submit" style={{ marginLeft: "0.5rem" }}>
-          {editingId ? "Actualizar" : "Agregar"}
-        </button>
-        {editingId && (
-          <button
-            type="button"
-            style={{ marginLeft: "0.5rem" }}
-            onClick={() => setEditingId(null)}
-          >
-            Cancelar
-          </button>
-        )}
-      </form>
+        <ClientList
+          clients={clientes}
+          onEdit={startEditing}
+          onDelete={handleDelete}
+        />
+      </section>
+    </main>
+  </div>
+);
 
-      {/* LISTA */}
-      <ul>
-        {clientes.map((c) => (
-          <li key={c.id} style={{ marginBottom: "0.5rem" }}>
-            <strong>
-              {c.firstName} {c.lastName}
-            </strong>
-            {" — "} {c.phone}
-            {c.address && ` — ${c.address}`}
-            {" — "} {c.status}
-            <button
-              style={{ marginLeft: "1rem" }}
-              onClick={() => startEditing(c)}
-            >
-              Editar
-            </button>
-            <button
-              style={{ marginLeft: "0.5rem", color: "red" }}
-              onClick={() => handleDelete(c.id)}
-            >
-              Borrar
-            </button>
-          </li>
-        ))}
-      </ul>
-    </div>
-  );
 }
 
 export default AppLayout;

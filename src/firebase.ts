@@ -8,13 +8,13 @@ import { getAuth } from "firebase/auth";
 // Esta es la configuración que te da Firebase al registrar la app.
 // Contiene las "credenciales" para conectar tu frontend al proyecto.
 const firebaseConfig = {
-  apiKey: "AIzaSyBeUWnGvynKS0j4kG6Gb6d6mDey2Fwbxpg",
-  authDomain: "customer-map-4dec4.firebaseapp.com",
-  projectId: "customer-map-4dec4",
-  storageBucket: "customer-map-4dec4.firebasestorage.app",
-  messagingSenderId: "984906486596",
-  appId: "1:984906486596:web:a1cad0b2130dc58e6d7d11",
-  measurementId: "G-1VHBFSZ75R",
+  apiKey: import.meta.env.VITE_FIREBASE_API_KEY,
+  authDomain: import.meta.env.VITE_FIREBASE_AUTH_DOMAIN,
+  projectId: import.meta.env.VITE_FIREBASE_PROJECT_ID,
+  storageBucket: import.meta.env.VITE_FIREBASE_STORAGE_BUCKET,
+  messagingSenderId: import.meta.env.VITE_FIREBASE_MESSAGING_SENDER_ID,
+  appId: import.meta.env.VITE_FIREBASE_APP_ID,
+  measurementId: import.meta.env.VITE_FIREBASE_MEASUREMENT_ID,
 };
 
 // Inicializo la app de Firebase con esa config.
