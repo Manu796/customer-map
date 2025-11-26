@@ -1,96 +1,87 @@
+// src/components/ClientList.tsx
 import React from "react";
-import {type ClienteConId } from "../services/clientes";
+import type { ClienteConId } from "../services/clientes";
 
 interface Props {
   clients: ClienteConId[];
   onEdit: (id: string) => void;
   onDelete: (id: string) => void;
+  onSelect?: (id: string) => void;
 }
 
-/*
-  Componente Listado de Clientes
-  ------------------------------
-
-  Este componente recibe:
-    - clients: listado de clientes desde Firestore
-    - onEdit: función llamada cuando se hace clic en "Editar"
-    - onDelete: función llamada cuando se hace clic en "Eliminar"
-
-  El objetivo es renderizar cada cliente como una "tarjeta" limpia y moderna,
-  similar al estilo WhatsApp Business / panel administrativo.
-*/
-
-export function ClientList({ clients, onEdit, onDelete }: Props) {
+export function ClientList({ clients, onEdit, onDelete, onSelect }: Props) {
   return (
     <div
-      style={{
-        background: "#111",            // Fondo oscuro principal
-        padding: "1.2rem",
-        borderRadius: "0.7rem",
-        border: "1px solid #333",
-      }}
+      className="
+        bg-slate-900 
+        border border-slate-700 
+        rounded-xl 
+        p-4 
+        sm:p-6 
+        shadow-lg
+      "
     >
-      <h3
-        style={{
-          marginBottom: "1.2rem",
-          fontSize: "1.2rem",
-          fontWeight: 600,
-        }}
-      >
+      <h3 className="text-lg font-semibold text-slate-100 mb-4">
         Clientes cargados
       </h3>
 
-      <ul style={{ listStyle: "none", padding: 0, margin: 0 }}>
+      <ul className="space-y-4">
         {clients.map((c) => (
           <li
             key={c.id}
-            style={{
-              background: "#1b1b1b",        // Tarjeta oscura
-              borderRadius: "0.6rem",
-              padding: "1rem",
-              marginBottom: "1rem",
-              display: "flex",
-              justifyContent: "space-between",
-              alignItems: "center",
-              boxShadow: "0 0 10px rgba(0,0,0,0.25)", // Sombra suave
-            }}
+            onClick={() => onSelect?.(c.id)}
+            className="
+              bg-slate-800 
+              border border-slate-700 
+              rounded-lg 
+              p-4 
+              flex 
+              flex-col 
+              sm:flex-row 
+              sm:items-center 
+              sm:justify-between 
+              gap-4
+              shadow-md
+              hover:border-blue-500
+              hover:bg-slate-750/80
+              cursor-pointer
+              transition-all
+            "
           >
-            {/* CONTENIDO IZQUIERDA: Info del cliente */}
+            {/* INFO IZQUIERDA */}
             <div>
-              {/* Nombre completo */}
-              <strong style={{ fontSize: "1.1rem" }}>
+              <p className="text-slate-100 text-lg font-semibold">
                 {c.firstName} {c.lastName}
-              </strong>
+              </p>
 
-              {/* Detalles */}
-              <div
-                style={{
-                  marginTop: "0.35rem",
-                  fontSize: "0.95rem",
-                  lineHeight: "1.35rem",
-                  color: "#ccc",
-                }}
-              >
-                {/* Dirección */}
-                <div>📍 Dirección: {c.address || "—"}</div>
-
-                {/* Estado */}
+              <div className="text-slate-400 text-sm mt-2 space-y-1">
+                {/* Teléfono */}
                 <div>
-                  🔵 Estado:{" "}
-                  <span
-                    style={{
-                      fontWeight: 600,
-                      color: c.status === "activo" ? "#4ade80" : "#f87171",
-                    }}
-                  >
-                    {c.status || "—"}
-                  </span>
+                  <span className="text-slate-500">📞 Teléfono:</span>{" "}
+                  {c.phone || "—"}
                 </div>
 
-                {/* Latitud & Longitud */}
+                {/* Dirección */}
                 <div>
-                  🌐 Lat/Lng:{" "}
-                  {c.lat !== undefined && c.lng !== undefined
+                  <span className="text-slate-500">📍 Dirección:</span>{" "}
+                  {c.address || "—"}
+                </div>
+
+                {/* Notas (si hay) */}
+                {c.notes && c.notes.trim() !== "" && (
+                  <div>
+                    <span className="text-slate-500">📝 Notas:</span>{" "}
+                    <span className="break-words">{c.notes}</span>
+                  </div>
+                )}
+
+                {/* Lat/Lng */}
+                <div>
+                  <span className="text-slate-500">🌐 Lat/Lng:</span>{" "}
+                  {typeof c.lat === "number" &&
+                  typeof c.lng === "number" &&
+                  !Number.isNaN(c.lat) &&
+                  !Number.isNaN(c.lng)
                     ? `${c.lat}, ${c.lng}`
                     : "No asignado"}
                 </div>
@@ -98,47 +89,40 @@ export function ClientList({ clients, onEdit, onDelete }: Props) {
             </div>
 
             {/* BOTONES DERECHA */}
-            <div style={{ display: "flex", gap: "0.5rem" }}>
-              {/* BOTÓN EDITAR */}
+            <div
+              onClick={(e) => e.stopPropagation()}
+              className="flex gap-2 sm:gap-3"
+            >
               <button
                 onClick={() => onEdit(c.id)}
-                style={{
-                  padding: "0.45rem 0.9rem",
-                  background: "#3b82f6",        // Azul estilo Tailwind
-                  color: "#fff",
-                  border: "none",
-                  borderRadius: "0.35rem",
-                  cursor: "pointer",
-                  fontWeight: 500,
-                }}
-                onMouseEnter={(e) =>
-                  (e.currentTarget.style.background = "#2563eb") // Hover más oscuro
-                }
-                onMouseLeave={(e) =>
-                  (e.currentTarget.style.background = "#3b82f6")
-                }
+                className="
+                  px-3 
+                  py-2 
+                  bg-blue-600 
+                  hover:bg-blue-500 
+                  text-white 
+                  rounded-lg 
+                  text-sm 
+                  font-medium 
+                  transition
+                "
               >
                 Editar
               </button>
 
-              {/* BOTÓN ELIMINAR */}
               <button
                 onClick={() => onDelete(c.id)}
-                style={{
-                  padding: "0.45rem 0.9rem",
-                  background: "#dc2626",        // Rojo peligro
-                  color: "#fff",
-                  border: "none",
-                  borderRadius: "0.35rem",
-                  cursor: "pointer",
-                  fontWeight: 500,
-                }}
-                onMouseEnter={(e) =>
-                  (e.currentTarget.style.background = "#b91c1c")
-                }
-                onMouseLeave={(e) =>
-                  (e.currentTarget.style.background = "#dc2626")
-                }
+                className="
+                  px-3 
+                  py-2 
+                  bg-red-600 
+                  hover:bg-red-500 
+                  text-white 
+                  rounded-lg 
+                  text-sm 
+                  font-medium 
+                  transition
+                "
               >
                 Eliminar
               </button>

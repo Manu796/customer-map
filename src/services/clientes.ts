@@ -24,11 +24,13 @@ export interface Cliente {
   lng?: number;
   createdAt?: any;
   updatedAt?: any;
+  notes?: string;
 }
 
 //Cliente con id (como lo voy a usar en el frontend)
 export interface ClienteConId extends Cliente {
   id: string;
+  notes?: string;
 }
 
 // CREATE → crea un nuevo cliente y devuelve el id
@@ -65,11 +67,10 @@ export async function obtenerClientes(userId: string): Promise<ClienteConId[]> {
   return clientes;
 }
 
-
 // UPDATE → actualiza un cliente existente
 export async function actualizarCliente(
   id: string,
-  data: Partial<Cliente>  // Partial = puedo mandar los campos que quiera cambiar
+  data: Partial<Cliente> // Partial = puedo mandar los campos que quiera cambiar
 ) {
   const ref = doc(db, "clients", id);
   await updateDoc(ref, {

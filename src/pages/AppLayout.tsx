@@ -1,3 +1,4 @@
+// src/layouts/AppLayout.tsx (o donde lo tengas)
 import { useEffect, useState, FormEvent } from "react";
 import { signOut } from "firebase/auth";
 import { useNavigate } from "react-router-dom";
@@ -14,6 +15,12 @@ import {
   type ClienteConId,
 } from "../services/clientes";
 
+/**
+ * 🔢 parseCoord
+ * --------------
+ * Convierte un string (con punto o coma) a número.
+ * Si no se puede convertir, devuelve undefined.
+ */
 function parseCoord(value: string): number | undefined {
   if (!value) return undefined;
   const normalized = value.replace(",", ".");
@@ -24,17 +31,24 @@ function parseCoord(value: string): number | undefined {
 function AppLayout() {
   const navigate = useNavigate();
   const { user } = useAuth();
+
+  // 📦 Estado: lista de clientes
   const [clientes, setClientes] = useState<ClienteConId[]>([]);
 
+  // 📦 Estado: formulario
   const [firstName, setFirstName] = useState("");
   const [lastName, setLastName] = useState("");
   const [phone, setPhone] = useState("");
   const [address, setAddress] = useState("");
-  const [status, setStatus] = useState<string>("activo");
   const [editingId, setEditingId] = useState<string | null>(null);
   const [lat, setLat] = useState<string>("");
+  const [notes, setNotes] = useState("");
   const [lng, setLng] = useState<string>("");
 
+  // 📌 Nuevo: cliente seleccionado para centrar/destacar en el mapa
+  const [selectedClientId, setSelectedClientId] = useState<string | null>(null);
+
+  // 🔁 Cargar clientes cuando haya usuario logueado
   useEffect(() => {
     if (!user) return;
     cargarClientes();
@@ -46,6 +60,11 @@ function AppLayout() {
     setClientes(lista);
   };
 
+  /**
+   * 📝 handleSubmit
+   * ----------------
+   * Maneja crear o actualizar un cliente según haya editingId o no.
+   */
   const handleSubmit = async (e: FormEvent) => {
     e.preventDefault();
     if (!user) return;
@@ -53,15 +72,17 @@ function AppLayout() {
     const latNum = parseCoord(lat);
     const lngNum = parseCoord(lng);
 
+    // Data base para Firestore
     const baseData: any = {
       firstName,
       lastName,
       phone,
       address,
-      status,
+      notes, // 👈 acá
       userId: user.uid,
     };
 
+    // Solo agregamos lat/lng si son válidos
     if (latNum !== undefined) baseData.lat = latNum;
     if (lngNum !== undefined) baseData.lng = lngNum;
 
@@ -71,39 +92,59 @@ function AppLayout() {
       await crearCliente(baseData);
     }
 
-    // limpiar inputs
+    // 🧹 Limpiar form
     setFirstName("");
     setLastName("");
     setPhone("");
     setAddress("");
-    setStatus("activo");
     setLat("");
     setLng("");
     setEditingId(null);
+    setNotes("");
+
+    // También podríamos limpiar la selección
+    setSelectedClientId(null);
 
     await cargarClientes();
   };
 
+  /**
+   * ✏️ startEditing
+   * ----------------
+   * Carga los datos del cliente en el formulario para poder editarlos.
+   * Además, marcamos ese cliente como "seleccionado" para centrarlo en el mapa.
+   */
   const startEditing = (id: string) => {
     const c = clientes.find((cl) => cl.id === id);
     if (!c) return;
+
     setEditingId(c.id);
     setFirstName(c.firstName);
     setLastName(c.lastName);
     setPhone(c.phone);
     setAddress(c.address);
-    setStatus(c.status ?? "activo");
+    setNotes(c.notes ?? ""); // suponiendo que agregues notes?: string al tipo
     setLat(c.lat?.toString() ?? "");
     setLng(c.lng?.toString() ?? "");
+
+    // 👉 al editar, también lo marcamos como seleccionado en el mapa
+    setSelectedClientId(id);
   };
 
+  /**
+   * 🗑 handleDelete
+   * ----------------
+   * Borra un cliente con confirmación.
+   */
   const handleDelete = async (id: string) => {
     if (!confirm("¿Seguro que querés borrar este cliente?")) return;
     await borrarCliente(id);
+    // Si borramos el cliente seleccionado, limpiamos la selección
+    setSelectedClientId((prev) => (prev === id ? null : prev));
     await cargarClientes();
   };
 
-  // 👉 posición editable para el marcador del mapa
+  // 👉 posición editable para el marcador del mapa (modo "nuevo" o edición manual)
   const latNum = parseCoord(lat);
   const lngNum = parseCoord(lng);
   const editablePosition =
@@ -111,101 +152,138 @@ function AppLayout() {
       ? { lat: latNum, lng: lngNum }
       : null;
 
-  
-    return (
-  <div style={{ height: "100vh", display: "flex", flexDirection: "column" }}>
-    {/* HEADER */}
-    <header
-      style={{
-        display: "flex",
-        justifyContent: "space-between",
-        alignItems: "center",
-        padding: "1rem",
-        height: "70px", // altura fija del header
-        flexShrink: 0,
-      }}
-    >
-      <h2>Clientes</h2>
-      <div>
-        {user?.email}
-        <button
-          onClick={async () => await signOut(auth)}
-          style={{ marginLeft: "1rem" }}
+  return (
+    // 🧱 Layout raíz: pantalla completa, fondo gris oscuro
+    <div className="min-h-screen flex flex-col bg-slate-950 text-slate-100">
+      {/* HEADER */}
+      <header
+        className="
+          h-16 
+          flex 
+          items-center 
+          justify-between 
+          px-4 
+          sm:px-6 
+          border-b 
+          border-slate-800 
+          bg-slate-900
+        "
+      >
+        <h2 className="text-lg sm:text-xl font-semibold">Clientes</h2>
+
+        <div className="flex items-center gap-3 text-sm">
+          <span className="text-slate-300">{user?.email}</span>
+          <button
+            onClick={async () => {
+              await signOut(auth);
+              // Si querés, podés navegar a login después:
+              // navigate("/login");
+            }}
+            className="
+              px-3 
+              py-1.5 
+              rounded-lg 
+              bg-red-600 
+              hover:bg-red-500 
+              text-white 
+              text-xs 
+              font-medium 
+              transition
+            "
+          >
+            Cerrar sesión
+          </button>
+        </div>
+      </header>
+
+      {/* CONTENEDOR PRINCIPAL */}
+      <main
+        className="
+          flex-1 
+          p-3 
+          sm:p-4 
+          lg:p-6 
+          overflow-hidden
+        "
+      >
+        {/* GRID principal: mapa + panel derecho */}
+        <div
+          className="
+            h-full 
+            grid 
+            grid-cols-1 
+            lg:grid-cols-[1.4fr_1fr] 
+            gap-4 
+            lg:gap-6
+          "
         >
-          Cerrar sesión
-        </button>
-      </div>
-    </header>
+          {/* 🗺️ MAPA */}
+          <section
+            className="
+              h-64 
+              lg:h-full 
+              rounded-xl 
+              border 
+              border-slate-800 
+              overflow-hidden 
+              bg-slate-900
+            "
+          >
+            <ClientMap
+              clientes={clientes}
+              editablePosition={editablePosition}
+              onEditableMove={(newLat, newLng) => {
+                // cuando movés el marcador editable, actualizamos el form
+                setLat(String(newLat));
+                setLng(String(newLng));
+              }}
+              // 💡 Nuevo prop: quién está seleccionado
+              selectedClientId={selectedClientId}
+            />
+          </section>
 
-    {/* CONTENEDOR PRINCIPAL SIN SCROLL GENERAL */}
-    <main
-      style={{
-        flex: 1,                       // ← ocupa todo lo que queda de la pantalla
-        display: "grid",
-        gridTemplateColumns: "1.4fr 1fr",
-        gap: "1rem",
-        padding: "1rem",
-        overflow: "hidden",            // ← evita scroll en la página completa
-      }}
-    >
-      {/* MAPA - ocupa todo el alto disponible */}
-      <section
-        style={{
-          height: "100%",
-          overflow: "hidden",
-          borderRadius: "0.7rem",
-        }}
-      >
-        <ClientMap
-          clientes={clientes}
-          editablePosition={editablePosition}
-          onEditableMove={(newLat, newLng) => {
-            setLat(String(newLat));
-            setLng(String(newLng));
-          }}
-        />
-      </section>
+          {/* 📋 PANEL DERECHO: formulario + listado, con scroll propio */}
+          <section
+            className="
+              h-full 
+              flex 
+              flex-col 
+              gap-4 
+              overflow-y-auto 
+              pr-1
+            "
+          >
+            <ClientForm
+              firstName={firstName}
+              lastName={lastName}
+              phone={phone}
+              address={address}
+              lat={lat}
+              lng={lng}
+              notes={notes}
+              editingId={editingId}
+              onSubmit={handleSubmit}
+              setFirstName={setFirstName}
+              setLastName={setLastName}
+              setPhone={setPhone}
+              setAddress={setAddress}
+              setLat={setLat}
+              setLng={setLng}
+              setNotes={setNotes}
+            />
 
-      {/* COLUMNA DERECHA: SCROLL INTERNO */}
-      <section
-        style={{
-          display: "flex",
-          flexDirection: "column",
-          gap: "1rem",
-          height: "100%",
-          overflowY: "auto",          // ← SOLO el panel derecho scrollea
-          paddingRight: "0.5rem",
-        }}
-      >
-        <ClientForm
-          firstName={firstName}
-          lastName={lastName}
-          phone={phone}
-          address={address}
-          lat={lat}
-          lng={lng}
-          status={status}
-          editingId={editingId}
-          onSubmit={handleSubmit}
-          setFirstName={setFirstName}
-          setLastName={setLastName}
-          setPhone={setPhone}
-          setAddress={setAddress}
-          setLat={setLat}
-          setLng={setLng}
-          setStatus={setStatus}
-        />
-
-        <ClientList
-          clients={clientes}
-          onEdit={startEditing}
-          onDelete={handleDelete}
-        />
-      </section>
-    </main>
-  </div>
-);
-
+            <ClientList
+              clients={clientes}
+              onEdit={startEditing}
+              onDelete={handleDelete}
+              // 👉 Al hacer clic en una card, seleccionamos el cliente para el mapa
+              onSelect={(id) => setSelectedClientId(id)}
+            />
+          </section>
+        </div>
+      </main>
+    </div>
+  );
 }
 
 export default AppLayout;
