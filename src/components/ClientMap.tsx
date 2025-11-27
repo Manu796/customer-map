@@ -1,15 +1,15 @@
-// src/components/ClientMap.tsx
 import {
   MapContainer,
   TileLayer,
   Marker,
-  Popup,
   useMap,
   useMapEvents,
 } from "react-leaflet";
 import type { ClienteConId } from "../services/clientes";
 import { Icon, LatLngExpression } from "leaflet";
+import * as L from "leaflet";
 import { useEffect } from "react";
+import "leaflet.markercluster";
 
 /**
  * 🎨 Iconos para Leaflet
@@ -52,28 +52,15 @@ const editableIcon = new Icon({
   iconAnchor: [15, 45],
 });
 
-/**
- * Props que recibe el mapa desde AppLayout
- */
 interface ClientMapProps {
-  // Todos los clientes del usuario
   clientes: ClienteConId[];
-
-  // Punto editable (lat/lng que viene del formulario)
   editablePosition?: { lat: number; lng: number } | null;
-
-  // Avisar al padre cuando cambia el punto editable
   onEditableMove?: (lat: number, lng: number) => void;
-
-  // Cliente seleccionado (para centrar y destacar)
   selectedClientId?: string | null;
 }
 
 /**
- * Componente auxiliar:
- * - Escucha cambios en selectedClientId
- * - Busca el cliente en la lista
- * - Centra el mapa en su posición
+ * Centra el mapa cuando cambia el cliente seleccionado
  */
 function CenterOnSelected({
   clientes,
@@ -98,7 +85,6 @@ function CenterOnSelected({
 
     const coords: LatLngExpression = [target.lat!, target.lng!];
 
-    // flyTo = animación suave hacia el punto
     map.flyTo(coords, 16, { duration: 0.8 });
   }, [selectedClientId, clientes, map]);
 
@@ -106,11 +92,7 @@ function CenterOnSelected({
 }
 
 /**
- * Componente auxiliar:
- * - Escucha clicks en cualquier parte del mapa
- * - Llama a onSelect(lat, lng)
- * Esto nos permite:
- *  - Hacer click en el mapa y que se llenen lat/lng del formulario
+ * Click en el mapa → actualiza lat/lng del formulario
  */
 function MapClickHandler({
   onSelect,
@@ -126,93 +108,144 @@ function MapClickHandler({
   return null;
 }
 
+function FixMapResize() {
+  const map = useMap();
+
+  useEffect(() => {
+    setTimeout(() => {
+      map.invalidateSize();
+    }, 150);
+  }, [map]);
+
+  return null;
+}
+
+/**
+ * 🔵 Marcadores de clientes agrupados en clusters
+ */
+function ClientMarkersCluster({
+  clientes,
+  selectedClientId,
+}: {
+  clientes: ClienteConId[];
+  selectedClientId: string | null;
+}) {
+  const map = useMap();
+
+  useEffect(() => {
+    if (!map) return;
+
+    // Creamos el grupo de clusters
+    const clusterGroup = (L as any).markerClusterGroup();
+
+    clientes
+      .filter(
+        (c) =>
+          typeof c.lat === "number" &&
+          typeof c.lng === "number" &&
+          !Number.isNaN(c.lat) &&
+          !Number.isNaN(c.lng)
+      )
+      .forEach((c) => {
+        const isSelected = c.id === selectedClientId;
+        const icon = isSelected ? selectedIcon : defaultIcon;
+
+        const marker = L.marker([c.lat as number, c.lng as number], {
+          icon,
+        });
+
+        const popupHtml = `
+          <div>
+            <strong>${c.firstName ?? ""} ${c.lastName ?? ""}</strong><br/>
+            📍 ${c.address || "Sin dirección"}<br/>
+            🌐 ${c.lat}, ${c.lng}<br/>
+            <a 
+              href="https://www.google.com/maps/dir/?api=1&destination=${
+                c.lat
+              },${c.lng}" 
+              target="_blank" 
+              rel="noopener noreferrer"
+              style="color:#3b82f6;font-weight:600;text-decoration:underline;"
+            >
+              Cómo llegar 🚗
+            </a>
+          </div>
+        `;
+
+        marker.bindPopup(popupHtml);
+        clusterGroup.addLayer(marker);
+      });
+
+    map.addLayer(clusterGroup);
+
+    // Cleanup al cambiar clientes / desmontar
+    return () => {
+      map.removeLayer(clusterGroup);
+    };
+  }, [map, clientes, selectedClientId]);
+
+  return null;
+}
+
 export function ClientMap({
   clientes,
   editablePosition = null,
   onEditableMove,
   selectedClientId = null,
 }: ClientMapProps) {
-  // Centro inicial del mapa → Santa Rosa
   const center: [number, number] = [-36.6167, -64.2833];
 
   return (
-    <div className="w-full h-full">
-      <MapContainer
-        center={center}
-        zoom={13}
-        className="w-full h-full rounded-xl"
-      >
-        {/* Capa base de OpenStreetMap */}
-        <TileLayer
-          attribution="&copy; OpenStreetMap contributors"
-          url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
-        />
+    <div className="h-full relative">
+      <div className="absolute inset-0">
+        <MapContainer
+          center={center}
+          zoom={13}
+          className="w-full h-full rounded-xl"
+        >
+          <FixMapResize />
 
-        {/* 🖱 Click en el mapa → actualiza lat/lng del formulario */}
-        {onEditableMove && (
-          <MapClickHandler
-            onSelect={(lat, lng) => {
-              onEditableMove(lat, lng);
-            }}
+          <TileLayer
+            attribution="&copy; OpenStreetMap contributors"
+            url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
           />
-        )}
 
-        {/* 🎯 Centrar cuando cambia el cliente seleccionado */}
-        <CenterOnSelected
-          clientes={clientes}
-          selectedClientId={selectedClientId ?? null}
-        />
+          {onEditableMove && (
+            <MapClickHandler
+              onSelect={(lat, lng) => {
+                onEditableMove(lat, lng);
+              }}
+            />
+          )}
 
-        {/* 🔵 Marcadores de clientes guardados */}
-        {clientes
-          .filter(
-            (c) =>
-              typeof c.lat === "number" &&
-              typeof c.lng === "number" &&
-              !Number.isNaN(c.lat) &&
-              !Number.isNaN(c.lng)
-          )
-          .map((c) => {
-            const isSelected = c.id === selectedClientId;
-
-            // Elegimos ícono según esté seleccionado o no
-            const icon = isSelected ? selectedIcon : defaultIcon;
-
-            return (
-              <Marker
-                key={c.id}
-                position={[c.lat as number, c.lng as number]}
-                icon={icon}
-              >
-                <Popup>
-                  <strong>
-                    {c.firstName} {c.lastName}
-                  </strong>
-                  <br />
-                  📍 {c.address}
-                  <br />
-                  🌐 {c.lat}, {c.lng}
-                </Popup>
-              </Marker>
-            );
-          })}
-
-        {/* ✏️ Marcador editable (cuando el form tiene lat/lng) */}
-        {editablePosition && (
-          <Marker
-            position={[editablePosition.lat, editablePosition.lng]}
-            draggable={true}
-            icon={editableIcon}
-            eventHandlers={{
-              dragend: (e) => {
-                const marker = e.target;
-                const pos = marker.getLatLng();
-                onEditableMove?.(pos.lat, pos.lng);
-              },
-            }}
+          <CenterOnSelected
+            clientes={clientes}
+            selectedClientId={selectedClientId ?? null}
           />
-        )}
-      </MapContainer>
+
+          {/* 🔵 Marcadores agrupados en clusters */}
+          <ClientMarkersCluster
+            clientes={clientes}
+            selectedClientId={selectedClientId ?? null}
+          />
+
+          {/* ✏️ Marcador editable (cuando el form tiene lat/lng) */}
+          {editablePosition && (
+            <Marker
+              position={[editablePosition.lat, editablePosition.lng]}
+              draggable={true}
+              icon={editableIcon}
+              eventHandlers={{
+                dragend: (e) => {
+                  const marker = e.target;
+                  const pos = marker.getLatLng();
+                  onEditableMove?.(pos.lat, pos.lng);
+                },
+              }}
+            />
+          )}
+        </MapContainer>
+      </div>
     </div>
   );
 }

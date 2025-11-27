@@ -25,7 +25,8 @@ interface Props {
   setNotes: (v: string) => void;
 }
 
-/**
+
+/*
  * ClientForm con Tailwind + validación visual
  * -------------------------------------------
  * - Nombre y Apellido obligatorios
@@ -50,6 +51,7 @@ export function ClientForm(props: Props) {
     setLat,
     setLng,
     setNotes,
+    
   } = props;
 
   // 🧠 Errores por campo

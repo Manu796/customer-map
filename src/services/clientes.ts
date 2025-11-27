@@ -1,86 +1,106 @@
 import {
   collection,
   addDoc,
+  getDocs,
   query,
   where,
-  getDocs,
+  doc,
   updateDoc,
   deleteDoc,
-  doc,
-  serverTimestamp,
 } from "firebase/firestore";
-
 import { db } from "../firebase";
 
-// Caracteristicas base de un cliente
 export interface Cliente {
   firstName: string;
   lastName: string;
   phone: string;
   address: string;
-  status: string;
-  userId: string;
   lat?: number;
   lng?: number;
-  createdAt?: any;
-  updatedAt?: any;
   notes?: string;
+  userId: string;
 }
 
-//Cliente con id (como lo voy a usar en el frontend)
 export interface ClienteConId extends Cliente {
   id: string;
-  notes?: string;
 }
 
-// CREATE → crea un nuevo cliente y devuelve el id
-export async function crearCliente(
-  cliente: Omit<Cliente, "createdAt" | "updatedAt">
-) {
-  const ref = collection(db, "clients"); // referencia a la colección clients en Firestore
+// ➤ Asegurado: ahora usa "clients"
+const COLLECTION = "clients";
 
-  const docRef = await addDoc(ref, {
-    ...cliente,
-    createdAt: serverTimestamp(),
-    updatedAt: serverTimestamp(),
-  });
-
-  return docRef.id; //devuelve el id
+/* ======================
+   CREAR
+====================== */
+export async function crearCliente(data: Cliente) {
+  const ref = collection(db, COLLECTION);
+  await addDoc(ref, data);
 }
 
-// READ → trae todos los clientes de un usuario
-export async function obtenerClientes(userId: string): Promise<ClienteConId[]> {
-  const ref = collection(db, "clients");
-
-  // armo una query: where userId == el user actual
+/* ======================
+   OBTENER (filtrado por usuario)
+====================== */
+export async function obtenerClientes(userId: string) {
+  const ref = collection(db, COLLECTION);
   const q = query(ref, where("userId", "==", userId));
+  const snap = await getDocs(q);
 
-  // ejecuto la query
-  const snapshot = await getDocs(q);
-
-  // transformo cada doc de Firestore en un objeto ClienteConId
-  const clientes: ClienteConId[] = snapshot.docs.map((d) => ({
-    id: d.id,
-    ...(d.data() as Cliente),
+  return snap.docs.map((docSnap) => ({
+    id: docSnap.id,
+    ...(docSnap.data() as Cliente),
   }));
-
-  return clientes;
 }
 
-// UPDATE → actualiza un cliente existente
-export async function actualizarCliente(
-  id: string,
-  data: Partial<Cliente> // Partial = puedo mandar los campos que quiera cambiar
-) {
-  const ref = doc(db, "clients", id);
-  await updateDoc(ref, {
-    ...data,
-    updatedAt: serverTimestamp(),
-  });
+/* ======================
+   ACTUALIZAR
+====================== */
+export async function actualizarCliente(id: string, data: Partial<Cliente>) {
+  const ref = doc(db, COLLECTION, id);
+  await updateDoc(ref, data);
 }
 
-// DELETE → borra un cliente por id
+/* ======================
+   BORRAR
+====================== */
 export async function borrarCliente(id: string) {
-  const ref = doc(db, "clients", id);
+  const ref = doc(db, COLLECTION, id);
   await deleteDoc(ref);
+}
+
+/* ======================
+   SPLIT FULL NAME
+====================== */
+export function splitFullName(fullName: string) {
+  const parts = fullName.trim().split(" ").filter(Boolean);
+
+  if (parts.length === 1) return { firstName: parts[0], lastName: "" };
+
+  const lastName = parts[parts.length - 1];
+  const firstName = parts.slice(0, -1).join(" ");
+
+  return { firstName, lastName };
+}
+
+/* ======================
+   NORMALIZAR NOMBRES
+====================== */
+export async function normalizarNombresClientes(userId: string) {
+  const ref = collection(db, COLLECTION);
+  const q = query(ref, where("userId", "==", userId));
+  const snap = await getDocs(q);
+
+  const ops: Promise<any>[] = [];
+
+  snap.forEach((docSnap) => {
+    const data = docSnap.data() as Cliente;
+    const { firstName, lastName } = data;
+
+    if (!lastName && firstName.includes(" ")) {
+      const { firstName: newFirst, lastName: newLast } =
+        splitFullName(firstName);
+      const d = doc(db, COLLECTION, docSnap.id);
+      ops.push(updateDoc(d, { firstName: newFirst, lastName: newLast }));
+    }
+  });
+
+  await Promise.all(ops);
 }

@@ -5,7 +5,9 @@ import { BrowserRouter } from "react-router-dom";
 import App from "./App.tsx";
 import "./index.css";
 import { AuthProvider } from "./context/AuthContext";
-import "leaflet/dist/leaflet.css"
+import "leaflet/dist/leaflet.css";
+import "leaflet.markercluster/dist/MarkerCluster.css";
+import "leaflet.markercluster/dist/MarkerCluster.Default.css";
 
 //import "leaflet/dist/leaflet.css"; // si ya estás usando Leaflet
 
