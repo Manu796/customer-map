@@ -1,28 +1,22 @@
+// src/components/ClientMap.tsx
 import {
   MapContainer,
   TileLayer,
   Marker,
+  Circle,
+  Popup,
   useMap,
   useMapEvents,
 } from "react-leaflet";
 import type { ClienteConId } from "../services/clientes";
 import { Icon, LatLngExpression } from "leaflet";
 import * as L from "leaflet";
-import { useEffect } from "react";
+import { useEffect, useRef } from "react";
 import "leaflet.markercluster";
 
 /**
- * 🎨 Iconos para Leaflet
- * -----------------------
- * Usamos el set de Leaflet Color Markers:
- * https://github.com/pointhi/leaflet-color-markers
- *
- * - defaultIcon   → clientes normales
- * - selectedIcon  → cliente seleccionado (resaltado)
- * - editableIcon  → marcador editable (lat/lng del formulario)
+ * 🎨 ICONOS
  */
-
-// 🟦 ICONO NORMAL (cliente cargado)
 const defaultIcon = new Icon({
   iconUrl:
     "https://raw.githubusercontent.com/pointhi/leaflet-color-markers/master/img/marker-icon-blue.png",
@@ -32,17 +26,15 @@ const defaultIcon = new Icon({
   iconAnchor: [12, 41],
 });
 
-// 🟩 ICONO SELECCIONADO (destacado)
 const selectedIcon = new Icon({
   iconUrl:
     "https://raw.githubusercontent.com/pointhi/leaflet-color-markers/master/img/marker-icon-green.png",
   shadowUrl:
     "https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/images/marker-shadow.png",
-  iconSize: [30, 45], // un poco más grande para que resalte
+  iconSize: [30, 45],
   iconAnchor: [15, 45],
 });
 
-// 🟨 ICONO EDITABLE (arrastrable / elegido con click)
 const editableIcon = new Icon({
   iconUrl:
     "https://raw.githubusercontent.com/pointhi/leaflet-color-markers/master/img/marker-icon-gold.png",
@@ -52,15 +44,19 @@ const editableIcon = new Icon({
   iconAnchor: [15, 45],
 });
 
+/**
+ * Props actualizados → incluye el filtro
+ */
 interface ClientMapProps {
   clientes: ClienteConId[];
   editablePosition?: { lat: number; lng: number } | null;
   onEditableMove?: (lat: number, lng: number) => void;
   selectedClientId?: string | null;
+  filter?: any; // 🔵 agregado
 }
 
 /**
- * Centra el mapa cuando cambia el cliente seleccionado
+ * 🧭 Centrar mapa al seleccionar cliente
  */
 function CenterOnSelected({
   clientes,
@@ -80,11 +76,9 @@ function CenterOnSelected({
         typeof c.lat === "number" &&
         typeof c.lng === "number"
     );
-
     if (!target) return;
 
     const coords: LatLngExpression = [target.lat!, target.lng!];
-
     map.flyTo(coords, 16, { duration: 0.8 });
   }, [selectedClientId, clientes, map]);
 
@@ -92,7 +86,7 @@ function CenterOnSelected({
 }
 
 /**
- * Click en el mapa → actualiza lat/lng del formulario
+ * 🖱 Click en el mapa → actualizar lat/lng editable
  */
 function MapClickHandler({
   onSelect,
@@ -104,24 +98,22 @@ function MapClickHandler({
       onSelect(e.latlng.lat, e.latlng.lng);
     },
   });
-
-  return null;
-}
-
-function FixMapResize() {
-  const map = useMap();
-
-  useEffect(() => {
-    setTimeout(() => {
-      map.invalidateSize();
-    }, 150);
-  }, [map]);
-
   return null;
 }
 
 /**
- * 🔵 Marcadores de clientes agrupados en clusters
+ * 🩹 Fix para que el mapa no aparezca cortado
+ */
+function FixMapResize() {
+  const map = useMap();
+  useEffect(() => {
+    setTimeout(() => map.invalidateSize(), 150);
+  }, [map]);
+  return null;
+}
+
+/**
+ * 🔵 CLUSTERING + Apertura automática
  */
 function ClientMarkersCluster({
   clientes,
@@ -132,11 +124,31 @@ function ClientMarkersCluster({
 }) {
   const map = useMap();
 
+  const markerRefs = useRef<Record<string, L.Marker>>({});
+  const clusterGroupRef = useRef<any>(null);
+
+  const createClusterIcon = (cluster: any) => {
+    const count = cluster.getChildCount();
+    return L.divIcon({
+      html: `<div class="cluster-bubble">${count}</div>`,
+      className: "cluster-custom",
+      iconSize: L.point(40, 40, true),
+    });
+  };
+
   useEffect(() => {
     if (!map) return;
 
-    // Creamos el grupo de clusters
-    const clusterGroup = (L as any).markerClusterGroup();
+    markerRefs.current = {};
+
+    const clusterGroup = (L as any).markerClusterGroup({
+      iconCreateFunction: createClusterIcon,
+      chunkedLoading: true,
+      spiderfyOnEveryZoom: false,
+      showCoverageOnHover: false,
+    });
+
+    clusterGroupRef.current = clusterGroup;
 
     clientes
       .filter(
@@ -147,51 +159,93 @@ function ClientMarkersCluster({
           !Number.isNaN(c.lng)
       )
       .forEach((c) => {
-        const isSelected = c.id === selectedClientId;
-        const icon = isSelected ? selectedIcon : defaultIcon;
+        const icon = c.id === selectedClientId ? selectedIcon : defaultIcon;
+        const marker = L.marker([c.lat!, c.lng!], { icon });
 
-        const marker = L.marker([c.lat as number, c.lng as number], {
-          icon,
-        });
-
-        const popupHtml = `
-          <div>
+        marker.bindPopup(`
+          <div style="font-size:14px; line-height:1.3">
             <strong>${c.firstName ?? ""} ${c.lastName ?? ""}</strong><br/>
             📍 ${c.address || "Sin dirección"}<br/>
             🌐 ${c.lat}, ${c.lng}<br/>
             <a 
               href="https://www.google.com/maps/dir/?api=1&destination=${
                 c.lat
-              },${c.lng}" 
-              target="_blank" 
-              rel="noopener noreferrer"
-              style="color:#3b82f6;font-weight:600;text-decoration:underline;"
+              },${c.lng}"
+              target="_blank"
+              style="color:#3b82f6; font-weight:600; text-decoration:underline;"
             >
               Cómo llegar 🚗
             </a>
           </div>
-        `;
+        `);
 
-        marker.bindPopup(popupHtml);
+        markerRefs.current[c.id] = marker;
         clusterGroup.addLayer(marker);
       });
 
     map.addLayer(clusterGroup);
 
-    // Cleanup al cambiar clientes / desmontar
     return () => {
       map.removeLayer(clusterGroup);
     };
   }, [map, clientes, selectedClientId]);
 
+  /** Abrir clúster automáticamente */
+  useEffect(() => {
+    if (!selectedClientId) return;
+    if (!clusterGroupRef.current) return;
+
+    const marker = markerRefs.current[selectedClientId];
+    if (!marker) return;
+
+    clusterGroupRef.current.zoomToShowLayer(marker, () => {
+      const pos = marker.getLatLng();
+      map.flyTo(pos, 18, { duration: 0.5 });
+      marker.openPopup();
+    });
+  }, [selectedClientId, map]);
+
   return null;
 }
 
+/**
+ * 🔵 Círculo del filtro (Google Maps style)
+ */
+function FilterCircle({ filter }: { filter: any }) {
+  if (!filter?.near) return null;
+
+  const center: LatLngExpression = [filter.near.lat, filter.near.lng];
+  const radius = filter.near.km * 1000;
+
+  return (
+    <>
+      <Circle
+        center={center}
+        radius={radius}
+        pathOptions={{
+          color: "#3b82f6",
+          fillColor: "#3b82f6",
+          fillOpacity: 0.18,
+          weight: 2,
+        }}
+      />
+
+      <Popup position={center}>
+        <div style={{ fontSize: "14px" }}>Radio: {filter.near.km} km</div>
+      </Popup>
+    </>
+  );
+}
+
+/**
+ * 🗺️ COMPONENTE PRINCIPAL DEL MAPA
+ */
 export function ClientMap({
   clientes,
   editablePosition = null,
   onEditableMove,
   selectedClientId = null,
+  filter = null,
 }: ClientMapProps) {
   const center: [number, number] = [-36.6167, -64.2833];
 
@@ -210,26 +264,29 @@ export function ClientMap({
             url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
           />
 
+          {/* Click para mover marcador editable */}
           {onEditableMove && (
             <MapClickHandler
-              onSelect={(lat, lng) => {
-                onEditableMove(lat, lng);
-              }}
+              onSelect={(lat, lng) => onEditableMove(lat, lng)}
             />
           )}
 
+          {/* 🔵 Círculo del filtro */}
+          <FilterCircle filter={filter} />
+
+          {/* Centrar cliente */}
           <CenterOnSelected
             clientes={clientes}
-            selectedClientId={selectedClientId ?? null}
+            selectedClientId={selectedClientId}
           />
 
-          {/* 🔵 Marcadores agrupados en clusters */}
+          {/* Clustering */}
           <ClientMarkersCluster
             clientes={clientes}
-            selectedClientId={selectedClientId ?? null}
+            selectedClientId={selectedClientId}
           />
 
-          {/* ✏️ Marcador editable (cuando el form tiene lat/lng) */}
+          {/* Marcador editable */}
           {editablePosition && (
             <Marker
               position={[editablePosition.lat, editablePosition.lng]}
@@ -237,8 +294,7 @@ export function ClientMap({
               icon={editableIcon}
               eventHandlers={{
                 dragend: (e) => {
-                  const marker = e.target;
-                  const pos = marker.getLatLng();
+                  const pos = e.target.getLatLng();
                   onEditableMove?.(pos.lat, pos.lng);
                 },
               }}

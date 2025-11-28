@@ -19,6 +19,7 @@ export interface Cliente {
   lng?: number;
   notes?: string;
   userId: string;
+  createdAt?: number; // Timestamp in milliseconds
 }
 
 export interface ClienteConId extends Cliente {
@@ -33,7 +34,11 @@ const COLLECTION = "clients";
 ====================== */
 export async function crearCliente(data: Cliente) {
   const ref = collection(db, COLLECTION);
-  await addDoc(ref, data);
+  const clienteConFecha = {
+    ...data,
+    createdAt: Date.now(), // Add timestamp
+  };
+  await addDoc(ref, clienteConFecha);
 }
 
 /* ======================
