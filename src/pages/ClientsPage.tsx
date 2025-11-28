@@ -212,10 +212,17 @@ const filteredClientes = clientes.filter((cliente) => {
             <div className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 dark:text-slate-500">
               🔍
             </div>
+            {/* Searching indicator */}
+            {searchQuery && searchQuery !== debouncedSearch && (
+              <div className="absolute right-10 top-1/2 -translate-y-1/2 flex items-center gap-1 text-xs text-sky-600 dark:text-sky-400">
+                <div className="animate-spin h-3 w-3 border-2 border-sky-600 dark:border-sky-400 border-t-transparent rounded-full"></div>
+                <span className="hidden sm:inline">Buscando...</span>
+              </div>
+            )}
             {searchQuery && (
               <button
                 onClick={() => setSearchQuery("")}
-                className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-500 hover:text-slate-300"
+                className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-500 hover:text-slate-700 dark:hover:text-slate-300 transition-colors"
               >
                 ✕
               </button>

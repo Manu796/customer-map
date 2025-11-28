@@ -1,5 +1,6 @@
 // src/components/ClientForm.tsx
-import React, { useState, FormEvent } from "react";
+import { useState, type FormEvent } from "react";
+import { EditableMap } from "./EditableMap";
 
 interface Props {
   // Valores controlados (vienen del padre)
@@ -256,6 +257,46 @@ export function ClientForm(props: Props) {
             "
           />
         </div>
+
+        {/* Interactive Map Section */}
+        {lat && lng && !isNaN(parseFloat(lat)) && !isNaN(parseFloat(lng)) ? (
+          // Show map if we have valid coordinates
+          <div className="md:col-span-3">
+            <label className="text-xs font-medium text-slate-300 mb-2 block">
+              📍 Ubicación en el Mapa
+            </label>
+            <EditableMap
+              lat={parseFloat(lat)}
+              lng={parseFloat(lng)}
+              onLocationChange={(newLat, newLng) => {
+                setLat(newLat.toFixed(6));
+                setLng(newLng.toFixed(6));
+              }}
+            />
+          </div>
+        ) : (
+          // Show button to add location if no coordinates
+          <div className="md:col-span-3">
+            <label className="text-xs font-medium text-slate-300 mb-2 block">
+              📍 Ubicación en el Mapa
+            </label>
+            <div className="flex flex-col items-center justify-center h-64 rounded-lg border-2 border-dashed border-slate-700 bg-slate-950/40">
+              <div className="text-4xl mb-3">🗺️</div>
+              <p className="text-sm text-slate-400 mb-3">Este cliente no tiene ubicación</p>
+              <button
+                type="button"
+                onClick={() => {
+                  // Set default coordinates (you can change these to your preferred default location)
+                  setLat("-36.6167");
+                  setLng("-64.2833");
+                }}
+                className="px-4 py-2 rounded-lg bg-sky-600 hover:bg-sky-500 text-sm font-medium transition-colors"
+              >
+                ➕ Agregar Ubicación
+              </button>
+            </div>
+          </div>
+        )}
 
         {/* Notas */}
         <div className="flex flex-col gap-1 md:col-span-3">
