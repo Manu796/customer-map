@@ -1,22 +1,21 @@
-// src/components/ProtectedRoute.tsx
-import { ReactNode } from "react";
+// ProtectedRoute.tsx
 import { Navigate } from "react-router-dom";
 import { useAuth } from "../context/AuthContext";
+import { FullScreenLoader } from "./FullScreenLoader";
 
-interface ProtectedRouteProps {
-  children: ReactNode;
-}
-
-export function ProtectedRoute({ children }: ProtectedRouteProps) {
+export function ProtectedRoute({ children }: { children: JSX.Element }) {
   const { user, loading } = useAuth();
 
+  // Si todavía está verificando sesión → mostramos loader
   if (loading) {
-    return <div style={{ padding: "1rem" }}>Cargando sesión...</div>;
+    return <FullScreenLoader />;
   }
 
+  // Si NO hay usuario → forzamos login
   if (!user) {
     return <Navigate to="/login" replace />;
   }
 
-  return <>{children}</>;
+  // Si hay usuario → render normal
+  return children;
 }

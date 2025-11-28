@@ -1,33 +1,39 @@
-import React from "react";
+// src/components/ClientForm.tsx
+import { useState, type FormEvent } from "react";
+import { EditableMap } from "./EditableMap";
 
 interface Props {
+  // Valores controlados (vienen del padre)
   firstName: string;
   lastName: string;
   phone: string;
   address: string;
   lat: string;
   lng: string;
-  status: string;
+  notes: string;
   editingId: string | null;
-  onSubmit: (e: React.FormEvent) => void;
+
+  // Handler de submit (lo define AppLayout)
+  onSubmit: (e: FormEvent) => void;
+
+  // Setters para actualizar estado en el padre
   setFirstName: (v: string) => void;
   setLastName: (v: string) => void;
   setPhone: (v: string) => void;
   setAddress: (v: string) => void;
   setLat: (v: string) => void;
   setLng: (v: string) => void;
-  setStatus: (v: string) => void;
+  setNotes: (v: string) => void;
 }
 
+
 /*
-  Versión corregida:
-
-  ✔ Inputs con espacio entre sí
-  ✔ Grid con más separación vertical
-  ✔ Focus visual sin romper tamaño
-  ✔ No se superponen nunca
-*/
-
+ * ClientForm con Tailwind + validación visual
+ * -------------------------------------------
+ * - Nombre y Apellido obligatorios
+ * - Teléfono obligatorio y solo numérico
+ * - Campo Notas opcional (textarea)
+ */
 export function ClientForm(props: Props) {
   const {
     firstName,
@@ -36,7 +42,7 @@ export function ClientForm(props: Props) {
     address,
     lat,
     lng,
-    status,
+    notes,
     editingId,
     onSubmit,
     setFirstName,
@@ -45,164 +51,285 @@ export function ClientForm(props: Props) {
     setAddress,
     setLat,
     setLng,
-    setStatus,
+    setNotes,
+    
   } = props;
 
-  // Estilos base del input: SE USA EN BLUR TAMBIÉN
-  const baseInputStyle: React.CSSProperties = {
-    width: "100%",
-    padding: "0.8rem 1rem",
-    background: "#1b1b1b",
-    border: "1px solid #333",
-    borderRadius: "0.55rem",
-    color: "white",
-    fontSize: "1rem",
-    outline: "none",
-    transition: "0.2s",
+  // 🧠 Errores por campo
+  const [errors, setErrors] = useState<{
+    firstName?: string;
+    lastName?: string;
+    phone?: string;
+  }>({});
 
-    // 👇 SEPARA visualmente las columnas
-    marginRight: "0.5rem",
-    marginLeft: "0.5rem",
+  const validate = () => {
+    const newErrors: typeof errors = {};
+
+    if (!firstName.trim()) {
+      newErrors.firstName = "El nombre es obligatorio.";
+    }
+
+    if (!lastName.trim()) {
+      newErrors.lastName = "El apellido es obligatorio.";
+    }
+
+    if (!phone.trim()) {
+      newErrors.phone = "El teléfono es obligatorio.";
+    } else if (!/^[0-9]+$/.test(phone)) {
+      newErrors.phone = "El teléfono debe contener solo números.";
+    }
+
+    setErrors(newErrors);
+    return Object.keys(newErrors).length === 0;
   };
 
-  const applyFocus = (e: any) => {
-    Object.assign(e.target.style, {
-      border: "1px solid #3b82f6",
-      boxShadow: "0 0 0 2px rgba(59,130,246,0.25)",
-    });
-  };
-
-  const applyBlur = (e: any) => {
-    Object.assign(e.target.style, baseInputStyle);
+  const handleSubmit = (e: FormEvent) => {
+    e.preventDefault();
+    if (!validate()) return;
+    onSubmit(e);
   };
 
   return (
     <form
-      onSubmit={onSubmit}
-      style={{
-        background: "#111",
-        padding: "1.2rem",
-        borderRadius: "0.7rem",
-        border: "1px solid #333",
-        marginBottom: "1rem",
-      }}
+      onSubmit={handleSubmit}
+      className="
+        w-full
+        mb-4
+        rounded-xl
+        border border-slate-800
+        bg-slate-900
+        px-4 py-4
+        sm:px-6 sm:py-5
+        shadow-md
+      "
     >
-      <h3
-        style={{
-          marginBottom: "1rem",
-          fontSize: "1.2rem",
-          fontWeight: 600,
-        }}
-      >
+      {/* Título */}
+      <h3 className="mb-4 text-base sm:text-lg font-semibold text-slate-100">
         {editingId ? "Editar cliente" : "Agregar cliente"}
       </h3>
 
-      {/* GRID de 3 columnas con más separación */}
+      {/* GRID principal */}
       <div
-        style={{
-          display: "grid",
-          gridTemplateColumns: "repeat(3, 1fr)",
-          gap: "1rem",
-          marginBottom: "1.4rem",
-        }}
+        className="
+          grid
+          grid-cols-1
+          md:grid-cols-3
+          gap-4
+          mb-5
+        "
       >
-        {/* Primera fila */}
-        <input
-          type="text"
-          placeholder="Nombre"
-          value={firstName}
-          onChange={(e) => setFirstName(e.target.value)}
-          style={baseInputStyle}
-          onFocus={applyFocus}
-          onBlur={applyBlur}
-        />
+        {/* Nombre */}
+        <div className="flex flex-col gap-1">
+          <label className="text-xs font-medium text-slate-300">
+            Nombre <span className="text-red-400">*</span>
+          </label>
+          <input
+            type="text"
+            placeholder="Nombre"
+            value={firstName}
+            onChange={(e) => setFirstName(e.target.value)}
+            className={`
+              w-full rounded-lg px-3 py-2.5 text-sm
+              text-slate-100 placeholder-slate-500
+              outline-none transition bg-slate-950/60 border
+              ${
+                errors.firstName
+                  ? "border-red-500 focus:border-red-500 focus:ring-2 focus:ring-red-500/60"
+                  : "border-slate-700 focus:border-blue-500 focus:ring-2 focus:ring-blue-500/60"
+              }
+            `}
+          />
+          {errors.firstName && (
+            <p className="text-xs text-red-400 mt-0.5">{errors.firstName}</p>
+          )}
+        </div>
 
-        <input
-          type="text"
-          placeholder="Apellido"
-          value={lastName}
-          onChange={(e) => setLastName(e.target.value)}
-          style={baseInputStyle}
-          onFocus={applyFocus}
-          onBlur={applyBlur}
-        />
+        {/* Apellido */}
+        <div className="flex flex-col gap-1">
+          <label className="text-xs font-medium text-slate-300">
+            Apellido <span className="text-red-400">*</span>
+          </label>
+          <input
+            type="text"
+            placeholder="Apellido"
+            value={lastName}
+            onChange={(e) => setLastName(e.target.value)}
+            className={`
+              w-full rounded-lg px-3 py-2.5 text-sm
+              text-slate-100 placeholder-slate-500
+              outline-none transition bg-slate-950/60 border
+              ${
+                errors.lastName
+                  ? "border-red-500 focus:border-red-500 focus:ring-2 focus:ring-red-500/60"
+                  : "border-slate-700 focus:border-blue-500 focus:ring-2 focus:ring-blue-500/60"
+              }
+            `}
+          />
+          {errors.lastName && (
+            <p className="text-xs text-red-400 mt-0.5">{errors.lastName}</p>
+          )}
+        </div>
 
-        <input
-          type="text"
-          placeholder="Teléfono"
-          value={phone}
-          onChange={(e) => setPhone(e.target.value)}
-          style={baseInputStyle}
-          onFocus={applyFocus}
-          onBlur={applyBlur}
-        />
+        {/* Teléfono */}
+        <div className="flex flex-col gap-1">
+          <label className="text-xs font-medium text-slate-300">
+            Teléfono <span className="text-red-400">*</span>
+          </label>
+          <input
+            type="text"
+            placeholder="Solo números"
+            value={phone}
+            onChange={(e) => setPhone(e.target.value)}
+            className={`
+              w-full rounded-lg px-3 py-2.5 text-sm
+              text-slate-100 placeholder-slate-500
+              outline-none transition bg-slate-950/60 border
+              ${
+                errors.phone
+                  ? "border-red-500 focus:border-red-500 focus:ring-2 focus:ring-red-500/60"
+                  : "border-slate-700 focus:border-blue-500 focus:ring-2 focus:ring-blue-500/60"
+              }
+            `}
+          />
+          {errors.phone && (
+            <p className="text-xs text-red-400 mt-0.5">{errors.phone}</p>
+          )}
+        </div>
 
-        {/* Dirección — fila completa */}
-        <input
-          type="text"
-          placeholder="Dirección"
-          value={address}
-          onChange={(e) => setAddress(e.target.value)}
-          style={{ ...baseInputStyle, gridColumn: "span 3" }}
-          onFocus={applyFocus}
-          onBlur={applyBlur}
-        />
+        {/* Dirección */}
+        <div className="flex flex-col gap-1 md:col-span-3">
+          <label className="text-xs font-medium text-slate-300">
+            Dirección
+          </label>
+          <input
+            type="text"
+            placeholder="Dirección"
+            value={address}
+            onChange={(e) => setAddress(e.target.value)}
+            className="
+              w-full rounded-lg border border-slate-700
+              bg-slate-950/60 px-3 py-2.5 text-sm
+              text-slate-100 placeholder-slate-500
+              outline-none transition
+              focus:border-blue-500 focus:ring-2 focus:ring-blue-500/60
+            "
+          />
+        </div>
 
         {/* Latitud */}
-        <input
-          type="text"
-          placeholder="Latitud"
-          value={lat}
-          onChange={(e) => setLat(e.target.value)}
-          style={baseInputStyle}
-          onFocus={applyFocus}
-          onBlur={applyBlur}
-        />
+        <div className="flex flex-col gap-1">
+          <label className="text-xs font-medium text-slate-300">
+            Latitud{" "}
+            <span className="text-[10px] text-slate-400">(opcional)</span>
+          </label>
+          <input
+            type="text"
+            placeholder="Ej: -36.6384"
+            value={lat}
+            onChange={(e) => setLat(e.target.value)}
+            className="
+              w-full rounded-lg border border-slate-700
+              bg-slate-950/60 px-3 py-2.5 text-sm
+              text-slate-100 placeholder-slate-500
+              outline-none transition
+              focus:border-blue-500 focus:ring-2 focus:ring-blue-500/60
+            "
+          />
+        </div>
 
         {/* Longitud */}
-        <input
-          type="text"
-          placeholder="Longitud"
-          value={lng}
-          onChange={(e) => setLng(e.target.value)}
-          style={baseInputStyle}
-          onFocus={applyFocus}
-          onBlur={applyBlur}
-        />
+        <div className="flex flex-col gap-1">
+          <label className="text-xs font-medium text-slate-300">
+            Longitud{" "}
+            <span className="text-[10px] text-slate-400">(opcional)</span>
+          </label>
+          <input
+            type="text"
+            placeholder="Ej: -64.2745"
+            value={lng}
+            onChange={(e) => setLng(e.target.value)}
+            className="
+              w-full rounded-lg border border-slate-700
+              bg-slate-950/60 px-3 py-2.5 text-sm
+              text-slate-100 placeholder-slate-500
+              outline-none transition
+              focus:border-blue-500 focus:ring-2 focus:ring-blue-500/60
+            "
+          />
+        </div>
 
-        {/* Estado */}
-        <select
-          value={status}
-          onChange={(e) => setStatus(e.target.value)}
-          style={{
-            ...baseInputStyle,
-            appearance: "none",
-            cursor: "pointer",
-          }}
-          onFocus={applyFocus}
-          onBlur={applyBlur}
-        >
-          <option value="activo">Activo</option>
-          <option value="inactivo">Inactivo</option>
-        </select>
+        {/* Interactive Map Section */}
+        {lat && lng && !isNaN(parseFloat(lat)) && !isNaN(parseFloat(lng)) ? (
+          // Show map if we have valid coordinates
+          <div className="md:col-span-3">
+            <label className="text-xs font-medium text-slate-300 mb-2 block">
+              📍 Ubicación en el Mapa
+            </label>
+            <EditableMap
+              lat={parseFloat(lat)}
+              lng={parseFloat(lng)}
+              onLocationChange={(newLat, newLng) => {
+                setLat(newLat.toFixed(6));
+                setLng(newLng.toFixed(6));
+              }}
+            />
+          </div>
+        ) : (
+          // Show button to add location if no coordinates
+          <div className="md:col-span-3">
+            <label className="text-xs font-medium text-slate-300 mb-2 block">
+              📍 Ubicación en el Mapa
+            </label>
+            <div className="flex flex-col items-center justify-center h-64 rounded-lg border-2 border-dashed border-slate-700 bg-slate-950/40">
+              <div className="text-4xl mb-3">🗺️</div>
+              <p className="text-sm text-slate-400 mb-3">Este cliente no tiene ubicación</p>
+              <button
+                type="button"
+                onClick={() => {
+                  // Set default coordinates (you can change these to your preferred default location)
+                  setLat("-36.6167");
+                  setLng("-64.2833");
+                }}
+                className="px-4 py-2 rounded-lg bg-sky-600 hover:bg-sky-500 text-sm font-medium transition-colors"
+              >
+                ➕ Agregar Ubicación
+              </button>
+            </div>
+          </div>
+        )}
+
+        {/* Notas */}
+        <div className="flex flex-col gap-1 md:col-span-3">
+          <label className="text-xs font-medium text-slate-300">
+            Notas <span className="text-[10px] text-slate-400">(opcional)</span>
+          </label>
+          <textarea
+            placeholder="Ej: Cliente solo por la mañana, tiene portón eléctrico, dejar aviso si no está..."
+            value={notes}
+            onChange={(e) => setNotes(e.target.value)}
+            rows={3}
+            className="
+              w-full rounded-lg border border-slate-700
+              bg-slate-950/60 px-3 py-2.5 text-sm
+              text-slate-100 placeholder-slate-500
+              outline-none resize-y
+              transition
+              focus:border-blue-500 focus:ring-2 focus:ring-blue-500/60
+            "
+          />
+        </div>
       </div>
 
       {/* BOTÓN */}
       <button
         type="submit"
-        style={{
-          background: "#3b82f6",
-          padding: "0.7rem 1.2rem",
-          borderRadius: "0.45rem",
-          border: "none",
-          color: "white",
-          cursor: "pointer",
-          fontSize: "1rem",
-          fontWeight: 600,
-          width: "fit-content",
-        }}
-        onMouseEnter={(e) => (e.currentTarget.style.background = "#2563eb")}
-        onMouseLeave={(e) => (e.currentTarget.style.background = "#3b82f6")}
+        className="
+          inline-flex items-center
+          px-4 py-2.5 rounded-lg
+          bg-blue-600 hover:bg-blue-500
+          text-sm font-semibold text-white
+          shadow-sm transition
+        "
       >
         {editingId ? "Guardar cambios" : "Agregar cliente"}
       </button>

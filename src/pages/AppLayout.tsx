@@ -1,211 +1,179 @@
-import { useEffect, useState, FormEvent } from "react";
+import { useState } from "react";
+import { NavLink, Outlet, useLocation, useNavigate } from "react-router-dom";
 import { signOut } from "firebase/auth";
-import { useNavigate } from "react-router-dom";
 import { auth } from "../firebase";
 import { useAuth } from "../context/AuthContext";
-import { ClientMap } from "../components/ClientMap";
-import { ClientForm } from "../components/ClientForm";
-import { ClientList } from "../components/ClientList";
-import {
-  crearCliente,
-  obtenerClientes,
-  actualizarCliente,
-  borrarCliente,
-  type ClienteConId,
-} from "../services/clientes";
+import { useTheme } from "../context/ThemeContext";
 
-function parseCoord(value: string): number | undefined {
-  if (!value) return undefined;
-  const normalized = value.replace(",", ".");
-  const num = Number(normalized);
-  return Number.isNaN(num) ? undefined : num;
-}
+type NavItem = {
+  label: string;
+  to: string;
+};
 
-function AppLayout() {
+const navItems: NavItem[] = [
+  { label: "Resumen", to: "/app" },
+  { label: "Clientes", to: "/app/clients" },
+  { label: "Configuración", to: "/app/settings" },
+];
+
+export default function AppLayout() {
+  const [sidebarOpen, setSidebarOpen] = useState(false);
+  const location = useLocation();
   const navigate = useNavigate();
   const { user } = useAuth();
-  const [clientes, setClientes] = useState<ClienteConId[]>([]);
+  const { theme, toggleTheme } = useTheme();
 
-  const [firstName, setFirstName] = useState("");
-  const [lastName, setLastName] = useState("");
-  const [phone, setPhone] = useState("");
-  const [address, setAddress] = useState("");
-  const [status, setStatus] = useState<string>("activo");
-  const [editingId, setEditingId] = useState<string | null>(null);
-  const [lat, setLat] = useState<string>("");
-  const [lng, setLng] = useState<string>("");
-
-  useEffect(() => {
-    if (!user) return;
-    cargarClientes();
-  }, [user]);
-
-  const cargarClientes = async () => {
-    if (!user) return;
-    const lista = await obtenerClientes(user.uid);
-    setClientes(lista);
-  };
-
-  const handleSubmit = async (e: FormEvent) => {
-    e.preventDefault();
-    if (!user) return;
-
-    const latNum = parseCoord(lat);
-    const lngNum = parseCoord(lng);
-
-    const baseData: any = {
-      firstName,
-      lastName,
-      phone,
-      address,
-      status,
-      userId: user.uid,
-    };
-
-    if (latNum !== undefined) baseData.lat = latNum;
-    if (lngNum !== undefined) baseData.lng = lngNum;
-
-    if (editingId) {
-      await actualizarCliente(editingId, baseData);
-    } else {
-      await crearCliente(baseData);
+  const handleLogout = async () => {
+    try {
+      await signOut(auth);
+      navigate("/login", { replace: true });
+    } catch (err) {
+      console.error("Error al cerrar sesión:", err);
     }
-
-    // limpiar inputs
-    setFirstName("");
-    setLastName("");
-    setPhone("");
-    setAddress("");
-    setStatus("activo");
-    setLat("");
-    setLng("");
-    setEditingId(null);
-
-    await cargarClientes();
   };
 
-  const startEditing = (id: string) => {
-    const c = clientes.find((cl) => cl.id === id);
-    if (!c) return;
-    setEditingId(c.id);
-    setFirstName(c.firstName);
-    setLastName(c.lastName);
-    setPhone(c.phone);
-    setAddress(c.address);
-    setStatus(c.status ?? "activo");
-    setLat(c.lat?.toString() ?? "");
-    setLng(c.lng?.toString() ?? "");
-  };
+  const currentPath = location.pathname;
 
-  const handleDelete = async (id: string) => {
-    if (!confirm("¿Seguro que querés borrar este cliente?")) return;
-    await borrarCliente(id);
-    await cargarClientes();
-  };
+  return (
+    <div className="flex h-screen bg-slate-100 dark:bg-slate-950 text-slate-900 dark:text-slate-50 transition-colors">
+      {/* SIDEBAR - mobile: drawer, desktop: fija */}
+      {sidebarOpen && (
+        <div
+          className="fixed inset-0 z-30 bg-black/40 md:hidden"
+          onClick={() => setSidebarOpen(false)}
+        />
+      )}
 
-  // 👉 posición editable para el marcador del mapa
-  const latNum = parseCoord(lat);
-  const lngNum = parseCoord(lng);
-  const editablePosition =
-    latNum !== undefined && lngNum !== undefined
-      ? { lat: latNum, lng: lngNum }
-      : null;
+      <aside
+        className={`
+          fixed inset-y-0 left-0 z-40 w-64 
+          bg-white dark:bg-slate-950 
+          border-r border-slate-300 dark:border-slate-800
+          transform transition-transform duration-200 ease-out
+          ${sidebarOpen ? "translate-x-0" : "-translate-x-full"}
+          md:static md:translate-x-0
+        `}
+      >
+        {/* Branding */}
+        <div className="h-16 flex items-center gap-2 px-4 border-b border-slate-300 dark:border-slate-800">
+          <div className="h-9 w-9 rounded-2xl bg-sky-500/10 flex items-center justify-center border border-sky-500/40">
+            <span className="text-xs font-bold text-sky-600 dark:text-sky-400 tracking-tight">
+              CM
+            </span>
+          </div>
+          <div className="leading-tight">
+            <p className="text-sm font-semibold text-slate-900 dark:text-slate-100">Customer Map</p>
+            <p className="text-[11px] text-slate-600 dark:text-slate-400">Panel de clientes</p>
+          </div>
+        </div>
 
-  
-    return (
-  <div style={{ height: "100vh", display: "flex", flexDirection: "column" }}>
-    {/* HEADER */}
-    <header
-      style={{
-        display: "flex",
-        justifyContent: "space-between",
-        alignItems: "center",
-        padding: "1rem",
-        height: "70px", // altura fija del header
-        flexShrink: 0,
-      }}
-    >
-      <h2>Clientes</h2>
-      <div>
-        {user?.email}
-        <button
-          onClick={async () => await signOut(auth)}
-          style={{ marginLeft: "1rem" }}
-        >
-          Cerrar sesión
-        </button>
+        {/* Navegación */}
+        <nav className="mt-4 px-2 space-y-1">
+          {navItems.map((item) => (
+            <NavLink
+              key={item.label}
+              to={item.to}
+              end={item.to === "/app"}
+              className={({ isActive }) =>
+                [
+                  "flex items-center gap-2 rounded-xl px-3 py-2 text-sm transition",
+                  isActive
+                    ? "bg-sky-100 dark:bg-sky-600/20 text-sky-700 dark:text-sky-200 border border-sky-300 dark:border-sky-500/60"
+                    : "text-slate-700 dark:text-slate-300 border border-transparent hover:bg-slate-100 dark:hover:bg-slate-900 hover:text-slate-900 dark:hover:text-slate-50",
+                ].join(" ")
+              }
+              onClick={() => setSidebarOpen(false)}
+            >
+              <span className="h-1.5 w-1.5 rounded-full bg-sky-600 dark:bg-sky-400" />
+              <span>{item.label}</span>
+            </NavLink>
+          ))}
+        </nav>
+      </aside>
+
+      {/* CONTENIDO PRINCIPAL */}
+      <div className="flex-1 flex flex-col min-h-screen">
+        <header className="h-16 border-b border-slate-300 dark:border-slate-800 bg-white dark:bg-slate-950 flex items-center justify-between px-3 md:px-6">
+          <div className="flex items-center gap-2">
+            <button
+              type="button"
+              className="md:hidden inline-flex items-center justify-center rounded-lg border border-slate-300 dark:border-slate-700 bg-slate-100 dark:bg-slate-900/60 p-1.5 text-slate-700 dark:text-slate-200 hover:bg-slate-200 dark:hover:bg-slate-800"
+              onClick={() => setSidebarOpen((v) => !v)}
+            >
+              <span className="sr-only">Abrir menú</span>
+              <div className="space-y-0.5">
+                <span className="block h-0.5 w-4 bg-slate-700 dark:bg-slate-200" />
+                <span className="block h-0.5 w-4 bg-slate-700 dark:bg-slate-200" />
+                <span className="block h-0.5 w-4 bg-slate-700 dark:bg-slate-200" />
+              </div>
+            </button>
+
+            <div className="flex flex-col">
+              <span className="text-sm font-medium text-slate-900 dark:text-slate-100">
+                {getPageTitle(currentPath)}
+              </span>
+              <span className="text-[11px] text-slate-600 dark:text-slate-500 hidden sm:inline">
+                {getPageSubtitle(currentPath)}
+              </span>
+            </div>
+          </div>
+
+          <div className="flex items-center gap-3">
+            {/* Theme Toggle */}
+            <button
+              onClick={toggleTheme}
+              className="p-2 rounded-lg border border-slate-300 dark:border-slate-700 bg-slate-100 dark:bg-slate-900/70 hover:bg-slate-200 dark:hover:bg-slate-800 transition-colors"
+              title={theme === "dark" ? "Modo claro" : "Modo oscuro"}
+            >
+              {theme === "dark" ? (
+                <span className="text-lg">☀️</span>
+              ) : (
+                <span className="text-lg">🌙</span>
+              )}
+            </button>
+
+            <div className="hidden sm:flex flex-col items-end leading-tight">
+              <span className="text-xs font-medium text-slate-900 dark:text-slate-100">
+                {user?.email || "Usuario"}
+              </span>
+              <span className="text-[11px] text-slate-600 dark:text-slate-500">Sesión activa</span>
+            </div>
+            <div className="h-8 w-8 rounded-full bg-gradient-to-br from-sky-500/30 to-sky-600/20 border border-sky-500/60 flex items-center justify-center text-xs font-semibold text-sky-700 dark:text-sky-200 shadow-lg">
+              {user?.email ? user.email[0].toUpperCase() : "U"}
+            </div>
+            <button
+              type="button"
+              onClick={handleLogout}
+              className="hidden sm:inline-flex items-center rounded-lg border border-slate-300 dark:border-slate-700 bg-slate-100 dark:bg-slate-900/70 px-3 py-1.5 text-xs font-medium text-slate-700 dark:text-slate-200 hover:bg-slate-200 dark:hover:bg-slate-800"
+            >
+              Cerrar sesión
+            </button>
+          </div>
+        </header>
+
+        <main className="flex-1 overflow-y-auto bg-slate-50 dark:bg-slate-950">
+          <div className="px-3 py-4 md:px-6 md:py-6">
+            <Outlet />
+          </div>
+        </main>
       </div>
-    </header>
-
-    {/* CONTENEDOR PRINCIPAL SIN SCROLL GENERAL */}
-    <main
-      style={{
-        flex: 1,                       // ← ocupa todo lo que queda de la pantalla
-        display: "grid",
-        gridTemplateColumns: "1.4fr 1fr",
-        gap: "1rem",
-        padding: "1rem",
-        overflow: "hidden",            // ← evita scroll en la página completa
-      }}
-    >
-      {/* MAPA - ocupa todo el alto disponible */}
-      <section
-        style={{
-          height: "100%",
-          overflow: "hidden",
-          borderRadius: "0.7rem",
-        }}
-      >
-        <ClientMap
-          clientes={clientes}
-          editablePosition={editablePosition}
-          onEditableMove={(newLat, newLng) => {
-            setLat(String(newLat));
-            setLng(String(newLng));
-          }}
-        />
-      </section>
-
-      {/* COLUMNA DERECHA: SCROLL INTERNO */}
-      <section
-        style={{
-          display: "flex",
-          flexDirection: "column",
-          gap: "1rem",
-          height: "100%",
-          overflowY: "auto",          // ← SOLO el panel derecho scrollea
-          paddingRight: "0.5rem",
-        }}
-      >
-        <ClientForm
-          firstName={firstName}
-          lastName={lastName}
-          phone={phone}
-          address={address}
-          lat={lat}
-          lng={lng}
-          status={status}
-          editingId={editingId}
-          onSubmit={handleSubmit}
-          setFirstName={setFirstName}
-          setLastName={setLastName}
-          setPhone={setPhone}
-          setAddress={setAddress}
-          setLat={setLat}
-          setLng={setLng}
-          setStatus={setStatus}
-        />
-
-        <ClientList
-          clients={clientes}
-          onEdit={startEditing}
-          onDelete={handleDelete}
-        />
-      </section>
-    </main>
-  </div>
-);
-
+    </div>
+  );
 }
 
-export default AppLayout;
+function getPageTitle(pathname: string): string {
+  if (pathname === "/app" || pathname === "/app/") return "Resumen";
+  if (pathname.startsWith("/app/clients")) return "Clientes";
+  if (pathname.startsWith("/app/settings")) return "Configuración";
+  return "Customer Map";
+}
+
+function getPageSubtitle(pathname: string): string {
+  if (pathname === "/app" || pathname === "/app/")
+    return "Visión general de tus clientes y actividad.";
+  if (pathname.startsWith("/app/clients"))
+    return "Mapa y lista de clientes con búsqueda y filtros.";
+  if (pathname.startsWith("/app/settings"))
+    return "Ajustá opciones del panel y tu cuenta.";
+  return "Panel de clientes.";
+}
